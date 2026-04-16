@@ -1,15 +1,42 @@
-<!DOCTYPE html>
+here<!DOCTYPE html>
 <html>
 <head>
   <title>Rush Drive 3D</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { margin: 0; overflow: hidden; background: black; }
+
     canvas { display: block; }
+
+    /* Buttons */
+    .controls {
+      position: fixed;
+      bottom: 20px;
+      width: 100%;
+      display: flex;
+      justify-content: space-around;
+    }
+
+    button {
+      width: 120px;
+      height: 60px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+    }
+
+    #gas { background: green; color: white; }
+    #brake { background: red; color: white; }
   </style>
 </head>
 <body>
 
 <canvas id="gameCanvas"></canvas>
+
+<div class="controls">
+  <button id="gas">ACCEL</button>
+  <button id="brake">BRAKE</button>
+</div>
 
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -20,44 +47,50 @@ canvas.height = window.innerHeight;
 
 // ===== LOAD IMAGES =====
 const road1 = new Image(); road1.src = "assets/road1.png";
-const road2 = new Image(); road2.src = "assets/road2.png";
-const road3 = new Image(); road3.src = "assets/road3.png";
-
 const playerCar = new Image(); playerCar.src = "assets/car.png";
-
-const enemy1 = new Image(); enemy1.src = "assets/enemy1.png";
-const enemy2 = new Image(); enemy2.src = "assets/enemy2.png";
-
-const policeCar = new Image(); policeCar.src = "assets/police.png";
+const enemyImg = new Image(); enemyImg.src = "assets/enemy1.png";
+const coinImg = new Image(); coinImg.src = "assets/enemy2.png"; // temp coin
 
 let currentRoad = road1;
-let enemyImages = [enemy1, enemy2];
+
+// ===== ROAD LIMIT =====
+let roadLeft = canvas.width * 0.2;
+let roadRight = canvas.width * 0.8;
 
 // ===== PLAYER =====
 let carWidth = 50;
 let carHeight = 100;
+
+// 🔥 camera নিচে (player নিচে নামানো)
 let carX = canvas.width / 2 - carWidth / 2;
-let carY = canvas.height - 130;
+let carY = canvas.height - 200;
 
 // ===== GAME STATE =====
 let enemies = [];
-let roadY = 0;
-let score = 0;
+let coins = [];
 
-// Speed system
+let roadY = 0;
 let speed = 3;
 let maxSpeed = 12;
-let isAccelerating = false;
 
-// Police
-let police = { x: 100, y: -200, active: false };
+let accelerating = false;
+let braking = false;
 
-// ===== SPAWN ENEMY =====
+let score = 0;
+let coinCount = 0;
+
+// ===== SPAWN =====
 function spawnEnemy() {
   enemies.push({
-    x: Math.random() * (canvas.width - carWidth),
-    y: -100,
-    img: enemyImages[Math.floor(Math.random() * enemyImages.length)]
+    x: Math.random() * (roadRight - roadLeft) + roadLeft,
+    y: -100
+  });
+}
+
+function spawnCoin() {
+  coins.push({
+    x: Math.random() * (roadRight - roadLeft) + roadLeft,
+    y: -50
   });
 }
 
@@ -66,33 +99,36 @@ function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // SPEED CONTROL
-  if (isAccelerating) {
+  if (accelerating) {
     speed += 0.1;
     if (speed > maxSpeed) speed = maxSpeed;
+  } else if (braking) {
+    speed -= 0.2;
+    if (speed < 2) speed = 2;
   } else {
     speed -= 0.05;
     if (speed < 3) speed = 3;
   }
 
-  // ROAD CHANGE
-  if (score > 10) currentRoad = road2;
-  if (score > 25) currentRoad = road3;
-
-  // DRAW ROAD
+  // ROAD
   roadY += speed;
   if (roadY >= canvas.height) roadY = 0;
 
   ctx.drawImage(currentRoad, 0, roadY - canvas.height, canvas.width, canvas.height);
   ctx.drawImage(currentRoad, 0, roadY, canvas.width, canvas.height);
 
+  // SIDE BLOCK
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, roadLeft, canvas.height);
+  ctx.fillRect(roadRight, 0, canvas.width - roadRight, canvas.height);
+
   // PLAYER
   ctx.drawImage(playerCar, carX, carY, carWidth, carHeight);
 
-  // ENEMIES
+  // ENEMY
   enemies.forEach((enemy, i) => {
     enemy.y += speed;
-
-    ctx.drawImage(enemy.img, enemy.x, enemy.y, carWidth, carHeight);
+    ctx.drawImage(enemyImg, enemy.x, enemy.y, carWidth, carHeight);
 
     // COLLISION
     if (
@@ -101,7 +137,8 @@ function gameLoop() {
       carY < enemy.y + carHeight &&
       carY + carHeight > enemy.y
     ) {
-      gameOver();
+      alert("Game Over!");
+      location.reload();
     }
 
     if (enemy.y > canvas.height) {
@@ -110,69 +147,60 @@ function gameLoop() {
     }
   });
 
-  // POLICE UNLOCK
-  if (speed > 8) police.active = true;
+  // COIN
+  coins.forEach((coin, i) => {
+    coin.y += speed;
+    ctx.drawImage(coinImg, coin.x, coin.y, 30, 30);
 
-  if (police.active) {
-    police.y += speed + 2;
-
-    if (police.x < carX) police.x += 2;
-    if (police.x > carX) police.x -= 2;
-
-    ctx.drawImage(policeCar, police.x, police.y, carWidth, carHeight);
-
+    // COLLECT
     if (
-      carX < police.x + carWidth &&
-      carX + carWidth > police.x &&
-      carY < police.y + carHeight &&
-      carY + carHeight > police.y
+      carX < coin.x + 30 &&
+      carX + carWidth > coin.x &&
+      carY < coin.y + 30 &&
+      carY + carHeight > coin.y
     ) {
-      gameOver();
+      coins.splice(i, 1);
+      coinCount++;
     }
-  }
+  });
 
   // SPAWN RATE
-  if (Math.random() < 0.03) spawnEnemy();
+  if (Math.random() < 0.02) spawnEnemy();
+  if (Math.random() < 0.015) spawnCoin();
 
   // UI
   ctx.fillStyle = "white";
   ctx.font = "20px Arial";
   ctx.fillText("Score: " + score, 20, 40);
-  ctx.fillText("Speed: " + Math.floor(speed * 20) + " km/h", 20, 70);
+  ctx.fillText("Coins: " + coinCount, 20, 70);
+  ctx.fillText("Speed: " + Math.floor(speed * 20) + " km/h", 20, 100);
 
   requestAnimationFrame(gameLoop);
 }
 
-// ===== GAME OVER =====
-function gameOver() {
-  alert("Game Over! Score: " + score);
-  location.reload();
-}
+// ===== BUTTON CONTROL =====
+const gasBtn = document.getElementById("gas");
+const brakeBtn = document.getElementById("brake");
 
-// ===== CONTROLS =====
-document.addEventListener("touchstart", () => {
-  isAccelerating = true;
-});
+gasBtn.onmousedown = () => accelerating = true;
+gasBtn.onmouseup = () => accelerating = false;
 
-document.addEventListener("touchend", () => {
-  isAccelerating = false;
-});
+brakeBtn.onmousedown = () => braking = true;
+brakeBtn.onmouseup = () => braking = false;
 
-document.addEventListener("mousedown", () => {
-  isAccelerating = true;
-});
+// MOBILE
+gasBtn.ontouchstart = () => accelerating = true;
+gasBtn.ontouchend = () => accelerating = false;
 
-document.addEventListener("mouseup", () => {
-  isAccelerating = false;
-});
+brakeBtn.ontouchstart = () => braking = true;
+brakeBtn.ontouchend = () => braking = false;
 
-// MOVE CAR
-document.addEventListener("touchmove", (e) => {
-  carX = e.touches[0].clientX - carWidth / 2;
-});
-
+// MOVE LEFT RIGHT
 document.addEventListener("mousemove", (e) => {
   carX = e.clientX - carWidth / 2;
+
+  if (carX < roadLeft) carX = roadLeft;
+  if (carX + carWidth > roadRight) carX = roadRight - carWidth;
 });
 
 gameLoop();
