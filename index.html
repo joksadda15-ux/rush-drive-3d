@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rush Drive 3D</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Load Images
+const road = new Image();
+road.src = "assets/road.png";
+
+const car = new Image();
+car.src = "assets/car.png";
+
+// Player
+let carWidth = 50;
+let carHeight = 100;
+let carX = canvas.width / 2 - carWidth / 2;
+let carY = canvas.height - 120;
+
+// Road scrolling
+let roadY = 0;
+
+// Game Loop
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Move road
+  roadY += 6;
+  if (roadY >= canvas.height) {
+    roadY = 0;
+  }
+
+  // Draw road (loop)
+  ctx.drawImage(road, 0, roadY - canvas.height, canvas.width, canvas.height);
+  ctx.drawImage(road, 0, roadY, canvas.width, canvas.height);
+
+  // Draw player car
+  ctx.drawImage(car, carX, carY, carWidth, carHeight);
+
+  requestAnimationFrame(gameLoop);
+}
+
+// Touch control (mobile)
+document.addEventListener("touchmove", (e) => {
+  carX = e.touches[0].clientX - carWidth / 2;
+});
+
+// Mouse control (PC)
+document.addEventListener("mousemove", (e) => {
+  carX = e.clientX - carWidth / 2;
+});
+
+// Start game
+gameLoop();
+</script>
+
+</body>
+</html>
